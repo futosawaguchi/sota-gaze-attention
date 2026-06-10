@@ -6,7 +6,9 @@ make_handler が select_primary→inout ゲート→targeter→sender を正し�
 
 from types import SimpleNamespace
 
-from app import INOUT_THRESHOLD, make_handler
+import pytest
+
+from app import INOUT_THRESHOLD, _parse_hostport, make_handler
 from sota.targeter import Smoother, camera_to_robot
 
 
@@ -22,6 +24,16 @@ class _FakeSender:
 
 def _gaze(yaw, pitch, inout):
     return SimpleNamespace(gaze_yaw=yaw, gaze_pitch=pitch, inout=inout, confidence=0.9)
+
+
+def test_parse_hostport():
+    assert _parse_hostport("localhost:8090") == ("localhost", 8090)
+    assert _parse_hostport("10.0.0.5:9000") == ("10.0.0.5", 9000)
+
+
+def test_parse_hostport_requires_port():
+    with pytest.raises(ValueError):
+        _parse_hostport("localhost")
 
 
 def test_no_send_when_no_primary():

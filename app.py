@@ -67,12 +67,31 @@ def run_local(source):
     GazePipeline(source=source, on_results=handler).run()
 
 
+def _parse_hostport(target):
+    """``HOST:PORT`` を (host, port:int) に分解する。"""
+    if ":" not in target:
+        raise ValueError(f"--subscribe は HOST:PORT 形式で指定してください（例: localhost:8090）。受領: {target!r}")
+    host, _, port = target.rpartition(":")
+    return host or "localhost", int(port)
+
+
 def run_subscribe(target):
-    """疎結合モード（未実装）。"""
-    raise NotImplementedError(
-        f"subscribe モード（{target}）は未実装です。gaze360 側 publisher (Phase A.5) "
-        "の実装後に対応します（SOTA_HANDOVER §4/§7）。"
-    )
+    """疎結合モード: gaze360 publisher を購読して on_results 互換で処理する。
+
+    torch も gaze360 も import しない（軽量）。GazeResult は消費側ミラーで復元する。
+    """
+    from dotenv import load_dotenv
+
+    from sota.gaze_result import select_primary  # 主対象選択は消費側ポリシー（両モード共有）
+    from sota.source import subscribe
+
+    host, port = _parse_hostport(target)
+    load_dotenv()
+    sender = SotaSender()
+    smoother = Smoother()
+    print(f"[sota] subscribe モード: {host}:{port} -> Sota {sender.host}:{sender.port}")
+    handler = make_handler(sender, smoother, select_primary)
+    subscribe(host, port, handler)
 
 
 def main():
@@ -84,7 +103,7 @@ def main():
     )
     mode.add_argument(
         "--subscribe", metavar="HOST:PORT",
-        help="疎結合: gaze360 publisher を購読（未実装・Phase A.5）",
+        help="疎結合: gaze360 publisher (--publish-port) を購読（torch 不要・軽量）",
     )
     parser.add_argument(
         "--source", default=None,
