@@ -54,7 +54,7 @@ def run_local(source):
 
     # 重い依存（torch 等）はここで初めて import する。
     from src.pipeline import GazePipeline
-    from src.gaze.result import select_primary
+    from sota.gaze_result import select_primary  # 主対象選択は消費側ポリシー（両モード共有）
 
     load_dotenv()
     sender = SotaSender()
