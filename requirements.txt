@@ -1,0 +1,9 @@
+# sota-gaze-attention の依存。
+#
+# このリポジトリ自体は軽量（.env 読み込みのみ）。
+#   pip install -r requirements.txt
+#
+# all-local（--local）で gaze360 を import する場合は、gaze360 の重い依存
+# （torch / gazelle(editable) / ultralytics / timm / py360convert など）を
+# gaze360/README.md の手順に従って別途インストールすること。
+python-dotenv>=1.0
