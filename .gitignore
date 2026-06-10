@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local-only docs (non-public)
+CLAUDE.md
+SOTA_HANDOVER.md
