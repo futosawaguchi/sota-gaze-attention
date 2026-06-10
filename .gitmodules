@@ -1,0 +1,3 @@
+[submodule "gaze360"]
+	path = gaze360
+	url = https://github.com/futosawaguchi/gaze360
