@@ -24,23 +24,26 @@ from sota.targeter import HEAD_P_LIMIT, HEAD_Y_LIMIT  # noqa: E402
 
 
 def build_poses(args):
-    """CLI 引数から送信する (Head_Y, Head_P, Head_R, label) の系列を作る。"""
+    """CLI 引数から送信する (Head_Y, Head_P, Head_R, Waist_Y, label) の系列を作る。
+
+    Waist_Y は None なら送信時に省略（頭のみ）。sweep は頭のみ。
+    """
     if args.sweep:
-        ymin, ymax = HEAD_Y_LIMIT
+        _, ymax = HEAD_Y_LIMIT
         pmin, pmax = HEAD_P_LIMIT
         amp_y = int(ymax * args.amp)      # 可動域の amp 割だけ振る（既定 0.5）
         amp_p_up, amp_p_down = int(pmax * args.amp), int(pmin * args.amp)
         return [
-            (0, 0, 0, "center"),
-            (amp_y, 0, 0, f"+Head_Y {amp_y}（右?）"),
-            (0, 0, 0, "center"),
-            (-amp_y, 0, 0, f"-Head_Y {-amp_y}（左?）"),
-            (0, 0, 0, "center"),
-            (0, amp_p_up, 0, f"+Head_P {amp_p_up}（上?）"),
-            (0, amp_p_down, 0, f"-Head_P {amp_p_down}（下?）"),
-            (0, 0, 0, "center"),
+            (0, 0, 0, None, "center"),
+            (amp_y, 0, 0, None, f"+Head_Y {amp_y}（右?）"),
+            (0, 0, 0, None, "center"),
+            (-amp_y, 0, 0, None, f"-Head_Y {-amp_y}（左?）"),
+            (0, 0, 0, None, "center"),
+            (0, amp_p_up, 0, None, f"+Head_P {amp_p_up}（上?）"),
+            (0, amp_p_down, 0, None, f"-Head_P {amp_p_down}（下?）"),
+            (0, 0, 0, None, "center"),
         ]
-    return [(args.head_y, args.head_p, args.head_r, "single")]
+    return [(args.head_y, args.head_p, args.head_r, args.waist_y, "single")]
 
 
 def main(argv=None):
@@ -48,6 +51,8 @@ def main(argv=None):
     parser.add_argument("--head-y", type=int, default=0, help="Head_Y パルス（左右）")
     parser.add_argument("--head-p", type=int, default=0, help="Head_P パルス（上下）")
     parser.add_argument("--head-r", type=int, default=0, help="Head_R パルス（傾き・通常 0）")
+    parser.add_argument("--waist-y", type=int, default=None, dest="waist_y",
+                        help="Waist_Y パルス（腰・左右）。指定時のみ送る（360°化の符号/可動域確認）")
     parser.add_argument("--sweep", action="store_true",
                         help="中心→±Head_Y→±Head_P の系列を順に送る（符号/可動域の確認）")
     parser.add_argument("--amp", type=float, default=0.5,
@@ -60,8 +65,8 @@ def main(argv=None):
     sender = SotaSender(host=args.ip, port=args.port)
     print(f"[poke] -> Sota {sender.host}:{sender.port}")
     poses = build_poses(args)
-    for i, (y, p, r, label) in enumerate(poses):
-        msg = sender.send(y, p, r)
+    for i, (y, p, r, w, label) in enumerate(poses):
+        msg = sender.send(y, p, r, waist_y=w)
         print(f"[poke] {label}: {msg}")
         if args.sweep and i < len(poses) - 1:
             time.sleep(args.interval)
