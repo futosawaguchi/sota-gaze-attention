@@ -13,7 +13,7 @@ from sota.sender import SotaSender
 LIMITS = {"Head_Y": (-1400, 1400), "Head_P": (-290, 110), "Head_R": (-300, 350)}
 
 
-def _recv_one(head_y, head_p, head_r=0):
+def _recv_one(head_y, head_p, head_r=0, waist_y=None):
     """受信ソケットを立てて 1 フレーム送受信し、復元した dict を返す。"""
     recv = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     recv.bind(("127.0.0.1", 0))  # 任意の空きポート
@@ -21,7 +21,7 @@ def _recv_one(head_y, head_p, head_r=0):
     try:
         _, port = recv.getsockname()
         with SotaSender(host="127.0.0.1", port=port) as sender:
-            sent = sender.send(head_y, head_p, head_r)
+            sent = sender.send(head_y, head_p, head_r, waist_y=waist_y)
         data, _ = recv.recvfrom(4096)
         return sent, json.loads(data.decode("utf-8"))
     finally:
@@ -47,5 +47,16 @@ def test_head_r_defaults_to_zero():
 
 def test_values_within_limits():
     _, got = _recv_one(1400, -290, 0)
-    for key, (lo, hi) in LIMITS.items():
+    for key in ("Head_Y", "Head_P", "Head_R"):
+        lo, hi = LIMITS[key]
         assert lo <= got[key] <= hi
+
+
+def test_waist_y_omitted_by_default():
+    _, got = _recv_one(0, 0)
+    assert "Waist_Y" not in got  # 既定は wire 不変（頭のみ）
+
+
+def test_waist_y_included_when_given():
+    _, got = _recv_one(0, 0, waist_y=300.7)
+    assert got["Waist_Y"] == 300 and isinstance(got["Waist_Y"], int)

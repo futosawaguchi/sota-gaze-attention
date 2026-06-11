@@ -29,8 +29,14 @@ class SotaSender:
         self.port = int(port if port is not None else os.environ.get("SOTA_PORT", DEFAULT_PORT))
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-    def send(self, head_y, head_p, head_r=0):
+    def send(self, head_y, head_p, head_r=0, waist_y=None):
         """頭部姿勢（パルス値）を 1 フレーム送信する。
+
+        Parameters
+        ----------
+        waist_y : int | None
+            腰ヨー（パルス値）。None なら ``Waist_Y`` キーを送らない（頭のみ・wire 不変）。
+            指定時のみ JSON に ``Waist_Y`` を含める（360° 化で頭の可動域を超えた分を腰で補う）。
 
         Returns
         -------
@@ -38,6 +44,8 @@ class SotaSender:
             実際に送ったメッセージ（ログ・テスト用）。
         """
         msg = {"Head_Y": int(head_y), "Head_P": int(head_p), "Head_R": int(head_r)}
+        if waist_y is not None:
+            msg["Waist_Y"] = int(waist_y)
         self._sock.sendto(json.dumps(msg).encode("utf-8"), (self.host, self.port))
         return msg
 
