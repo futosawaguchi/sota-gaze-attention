@@ -27,26 +27,30 @@ ssh root@<SOTA_IP>
 
 ## 3. Java を転送してコンパイル
 
+> 既存プロジェクト（sota-face-tracking / sota-attention-guidance）と同じ実機を使う場合、
+> **既にコンパイル済みの同一クラスが Sota にある**ので転送・コンパイルは不要 → 手順 4 へ。
+> 本リポジトリの [java/SotaController.java](../java/SotaController.java) はそれらとバイト同一。
+
+新規にデプロイ／作り直す場合（参考実機のパス `~/SotaSample`）:
+
 ```bash
-# Mac 側（このリポジトリのルートで）
-scp java/SotaController.java root@<SOTA_IP>:<vstone サンプルの src ディレクトリ>/
+# Mac 側（このリポジトリのルートで）。配置先は SotaSample の src ツリー（jp/vstone/sotatest）。
+scp java/SotaController.java root@<SOTA_IP>:/home/root/SotaSample/src/jp/vstone/sotatest/
 ```
 
 ```bash
-# Sota 側（ssh 接続後）。パッケージは jp.vstone.sotatest。
-# 配置先・classpath・コンパイル方法は Sota 内の vstone SDK レイアウトに依存するため、
-# 既存サンプル（jp.vstone.sotatest.* など）と同じ場所・同じ手順に合わせること。
-#   例) 既存サンプルが置かれている src ツリーに SotaController.java を置き、
-#       SDK 付属のビルド手順（javac -cp <RobotLib.jar 等> ...）でコンパイルする。
+# Sota 側（ssh 接続後）。SDK 付属のビルド手順でコンパイル（classpath は RobotLib の jar）。
+cd /home/root/SotaSample
+# 既存サンプルのビルド方法に倣う（例: javac -cp <RobotLib.jar 等> src/jp/vstone/sotatest/SotaController.java）
 ```
 
-> ⚠️ **環境依存ポイント**: Sota 内のディレクトリ構成・jar の場所・コンパイルコマンドは個体/SDK 版で異なる。
-> 既存の動作サンプルの置き場所とビルド手順に倣うのが確実。`import jp.vstone.RobotLib.*` が解決できる
-> classpath でコンパイルする。
+> ⚠️ **環境依存ポイント**: ディレクトリ構成・jar の場所・コンパイルコマンドは個体/SDK 版で異なる。
+> 既存の動作サンプル（`jp.vstone.sotatest.*`）の置き場所とビルド手順に倣うのが確実。
 
 ## 4. Sota 側で起動（UDP 9980 待受）
 
 ```bash
+cd /home/root/SotaSample/bin
 ./java_run.sh jp.vstone.sotatest.SotaController
 # => 標準出力に "SotaController ready. UDP port: 9980" / "UDP listening..." が出れば待受開始
 ```
@@ -61,6 +65,14 @@ cp .env.example .env        # 初回のみ
 # .env を編集: SOTA_IP=<SOTA_IP>  /  SOTA_PORT=9980
 ```
 
+**まず gaze 無しで素振り**（配線・符号の確認。THETA 不要）:
+
+```bash
+python scripts/sota_poke.py --sweep    # 中心→±Head_Y→±Head_P。首が動けば疎通 OK
+```
+
+その後 gaze 追従:
+
 ```bash
 # all-local（THETA を Mac で直結。要 gaze360 依存導入。CLAUDE.md 参照）
 python app.py --local
@@ -69,7 +81,7 @@ python app.py --local
 python app.py --subscribe localhost:8090
 ```
 
-Sota の頭が人の視線方向に追従すれば疎通 OK。
+Sota の頭が人の視線方向に追従すれば疎通 OK。向き・符号・追従の調整は [docs/calibration.md](calibration.md)。
 
 ## 6. 動作チェックと校正
 
