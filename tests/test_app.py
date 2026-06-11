@@ -8,8 +8,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from app import INOUT_THRESHOLD, _parse_hostport, make_handler
-from sota.targeter import Smoother, camera_to_robot
+from app import _parse_hostport, make_handler
+from sota.targeter import Calibration, Smoother
 
 
 class _FakeSender:
@@ -38,27 +38,29 @@ def test_parse_hostport_requires_port():
 
 def test_no_send_when_no_primary():
     sender = _FakeSender()
-    handle = make_handler(sender, Smoother(), select_primary=lambda r: None, verbose=False)
+    handle = make_handler(sender, Smoother(), lambda r: None, Calibration(), verbose=False)
     handle([])
     assert sender.sent == []
 
 
 def test_no_send_when_inout_below_threshold():
     sender = _FakeSender()
-    low = _gaze(10.0, 0.0, INOUT_THRESHOLD - 0.01)
-    handle = make_handler(sender, Smoother(), select_primary=lambda r: low, verbose=False)
+    calib = Calibration()
+    low = _gaze(10.0, 0.0, calib.inout_min - 0.01)
+    handle = make_handler(sender, Smoother(), lambda r: low, calib, verbose=False)
     handle([low])
     assert sender.sent == []
 
 
 def test_sends_clamped_pulses_when_gated():
     sender = _FakeSender()
+    calib = Calibration()
     g = _gaze(10.0, 5.0, 0.9)
     smoother = Smoother(deadband_deg=0.0)  # 平滑化の保留を避ける
-    handle = make_handler(sender, smoother, select_primary=lambda r: g, verbose=False)
+    handle = make_handler(sender, smoother, lambda r: g, calib, verbose=False)
     handle([g])
     assert len(sender.sent) == 1
-    # 初回 Smoother は生値を返す → camera_to_robot(10,5) と一致するはず。
-    head_y, head_p, head_r = camera_to_robot(10.0, 5.0)
+    # 初回 Smoother は生値を返す → calib.to_robot(10,5) と一致するはず。
+    head_y, head_p, head_r = calib.to_robot(10.0, 5.0)
     assert sender.sent[0] == {"Head_Y": head_y, "Head_P": head_p, "Head_R": head_r}
     assert sender.sent[0]["Head_R"] == 0

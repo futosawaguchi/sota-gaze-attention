@@ -15,29 +15,27 @@ import os
 import sys
 
 from sota.sender import SotaSender
-from sota.targeter import Smoother, camera_to_robot
+from sota.targeter import Calibration
 
 # gaze360 の src.xxx を解決可能にする（重い import はここではしない）。
 GAZE360_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gaze360")
 if GAZE360_DIR not in sys.path:
     sys.path.insert(0, GAZE360_DIR)
 
-INOUT_THRESHOLD = 0.3  # 視線がフレーム内にある確率の下限（これ未満は無視）
 
-
-def make_handler(sender, smoother, select_primary, verbose=True):
+def make_handler(sender, smoother, select_primary, calib, verbose=True):
     """1 フレーム分の list[GazeResult] を targeter→sender へ流すコールバックを作る。
 
     select_primary を引数で受けるのは、app.py のトップレベルで gaze360 を
-    import しない（--help を軽く保つ）ため。
+    import しない（--help を軽く保つ）ため。校正・ゲートは ``calib``（.env 由来）に従う。
     """
 
     def handle(results):
         primary = select_primary(results)
-        if not (primary and primary.inout >= INOUT_THRESHOLD):
+        if not (primary and primary.inout >= calib.inout_min):
             return
         yaw, pitch = smoother.update(primary.gaze_yaw, primary.gaze_pitch)
-        head_y, head_p, head_r = camera_to_robot(yaw, pitch)
+        head_y, head_p, head_r = calib.to_robot(yaw, pitch)
         msg = sender.send(head_y, head_p, head_r)
         if verbose:
             print(
@@ -57,13 +55,14 @@ def run_local(source):
     from sota.gaze_result import select_primary  # 主対象選択は消費側ポリシー（両モード共有）
 
     load_dotenv()
+    calib = Calibration.from_env()
     sender = SotaSender()
-    smoother = Smoother()
+    smoother = calib.make_smoother()
     print(
         f"[sota] all-local モード: source={source or 'THETA'} "
         f"-> Sota {sender.host}:{sender.port}"
     )
-    handler = make_handler(sender, smoother, select_primary)
+    handler = make_handler(sender, smoother, select_primary, calib)
     GazePipeline(source=source, on_results=handler).run()
 
 
@@ -87,10 +86,11 @@ def run_subscribe(target):
 
     host, port = _parse_hostport(target)
     load_dotenv()
+    calib = Calibration.from_env()
     sender = SotaSender()
-    smoother = Smoother()
+    smoother = calib.make_smoother()
     print(f"[sota] subscribe モード: {host}:{port} -> Sota {sender.host}:{sender.port}")
-    handler = make_handler(sender, smoother, select_primary)
+    handler = make_handler(sender, smoother, select_primary, calib)
     subscribe(host, port, handler)
 
 

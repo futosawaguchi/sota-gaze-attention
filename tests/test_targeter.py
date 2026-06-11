@@ -8,6 +8,7 @@ import pytest
 from sota.targeter import (
     HEAD_P_LIMIT,
     HEAD_Y_LIMIT,
+    Calibration,
     Smoother,
     camera_to_robot,
 )
@@ -51,6 +52,44 @@ def test_pitch_sign_flips_direction():
     up = camera_to_robot(0, 10, pulse_per_deg_pitch=2.0, pitch_sign=1.0)[1]
     down = camera_to_robot(0, 10, pulse_per_deg_pitch=2.0, pitch_sign=-1.0)[1]
     assert up == 20 and down == -20
+
+
+def test_yaw_sign_flips_direction():
+    right = camera_to_robot(10, 0, pulse_per_deg_yaw=2.0, yaw_sign=1.0)[0]
+    left = camera_to_robot(10, 0, pulse_per_deg_yaw=2.0, yaw_sign=-1.0)[0]
+    assert right == 20 and left == -20
+
+
+# --- Calibration: .env ロード / to_robot -------------------------------------
+
+def test_calibration_defaults_match_camera_to_robot():
+    calib = Calibration()
+    assert calib.to_robot(10.0, 5.0) == camera_to_robot(10.0, 5.0)
+
+
+def test_calibration_from_env_overrides(monkeypatch):
+    monkeypatch.setenv("SOTA_YAW_SIGN", "-1")
+    monkeypatch.setenv("SOTA_PULSE_PER_DEG_YAW", "2.0")
+    monkeypatch.setenv("SOTA_INOUT_MIN", "0.5")
+    monkeypatch.setenv("SOTA_EMA_ALPHA", "0.25")
+    calib = Calibration.from_env()
+    assert calib.yaw_sign == -1.0 and calib.pulse_per_deg_yaw == 2.0
+    assert calib.inout_min == 0.5 and calib.ema_alpha == 0.25
+    # yaw=10, sign=-1, gain=2 → -20
+    assert calib.to_robot(10.0, 0.0)[0] == -20
+
+
+def test_calibration_from_env_ignores_invalid(monkeypatch):
+    monkeypatch.setenv("SOTA_YAW_SIGN", "")          # 空
+    monkeypatch.setenv("SOTA_PITCH_SIGN", "abc")     # 不正
+    calib = Calibration.from_env()
+    assert calib.yaw_sign == 1.0 and calib.pitch_sign == 1.0  # 既定にフォールバック
+
+
+def test_calibration_make_smoother_uses_params():
+    calib = Calibration(ema_alpha=0.9, deadband_deg=3.0)
+    s = calib.make_smoother()
+    assert s.alpha == 0.9 and s.deadband_deg == 3.0
 
 
 # --- Smoother: EMA -----------------------------------------------------------
