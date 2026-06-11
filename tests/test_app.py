@@ -16,8 +16,10 @@ class _FakeSender:
     def __init__(self):
         self.sent = []
 
-    def send(self, head_y, head_p, head_r=0):
+    def send(self, head_y, head_p, head_r=0, waist_y=None):
         msg = {"Head_Y": head_y, "Head_P": head_p, "Head_R": head_r}
+        if waist_y is not None:
+            msg["Waist_Y"] = waist_y
         self.sent.append(msg)
         return msg
 
@@ -54,13 +56,23 @@ def test_no_send_when_inout_below_threshold():
 
 def test_sends_clamped_pulses_when_gated():
     sender = _FakeSender()
-    calib = Calibration()
+    calib = Calibration()  # waist 無効（既定）
     g = _gaze(10.0, 5.0, 0.9)
     smoother = Smoother(deadband_deg=0.0)  # 平滑化の保留を避ける
     handle = make_handler(sender, smoother, lambda r: g, calib, verbose=False)
     handle([g])
     assert len(sender.sent) == 1
     # 初回 Smoother は生値を返す → calib.to_robot(10,5) と一致するはず。
-    head_y, head_p, head_r = calib.to_robot(10.0, 5.0)
+    head_y, head_p, head_r, waist_y = calib.to_robot(10.0, 5.0)
+    assert waist_y is None  # waist 無効 → Waist_Y は送らない
     assert sender.sent[0] == {"Head_Y": head_y, "Head_P": head_p, "Head_R": head_r}
-    assert sender.sent[0]["Head_R"] == 0
+
+
+def test_forwards_waist_when_enabled():
+    sender = _FakeSender()
+    # 頭の可動域(80°)を超える方位 → 腰が補う。
+    calib = Calibration(waist_enabled=True, head_yaw_max_deg=80.0)
+    g = _gaze(120.0, 0.0, 0.9)
+    handle = make_handler(sender, Smoother(deadband_deg=0.0), lambda r: g, calib, verbose=False)
+    handle([g])
+    assert "Waist_Y" in sender.sent[0] and sender.sent[0]["Waist_Y"] != 0

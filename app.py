@@ -35,8 +35,8 @@ def make_handler(sender, smoother, select_primary, calib, verbose=True):
         if not (primary and primary.inout >= calib.inout_min):
             return
         yaw, pitch = smoother.update(primary.gaze_yaw, primary.gaze_pitch)
-        head_y, head_p, head_r = calib.to_robot(yaw, pitch)
-        msg = sender.send(head_y, head_p, head_r)
+        head_y, head_p, head_r, waist_y = calib.to_robot(yaw, pitch)
+        msg = sender.send(head_y, head_p, head_r, waist_y=waist_y)
         if verbose:
             print(
                 f"[sota] gaze=({primary.gaze_yaw:.1f},{primary.gaze_pitch:.1f}) "
